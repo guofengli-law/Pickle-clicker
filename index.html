@@ -1,0 +1,512 @@
+from pathlib import Path
+
+html = r'''<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pickle Clicker</title>
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Arial, sans-serif;
+      color: #17351f;
+      background: linear-gradient(135deg, #d9ffb8, #8bd47a);
+      padding: 20px;
+    }
+
+    .game {
+      width: min(1100px, 100%);
+      margin: auto;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: clamp(2.2rem, 6vw, 4.5rem);
+      margin: 5px 0 12px;
+      color: #1d642f;
+      text-shadow: 3px 3px #f3ff9c;
+    }
+
+    .top-bar {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .stat {
+      background: rgba(255,255,255,.88);
+      border: 4px solid #347b3e;
+      border-radius: 18px;
+      padding: 13px;
+      text-align: center;
+      font-weight: bold;
+      box-shadow: 0 7px 0 #23572b;
+    }
+
+    .stat span {
+      display: block;
+      margin-top: 5px;
+      font-size: 1.45rem;
+      color: #1a702f;
+    }
+
+    .main-area {
+      display: grid;
+      grid-template-columns: 1fr 1.15fr;
+      gap: 18px;
+    }
+
+    .panel {
+      background: rgba(255,255,255,.9);
+      border: 5px solid #347b3e;
+      border-radius: 24px;
+      padding: 18px;
+      box-shadow: 0 10px 0 #23572b;
+    }
+
+    .click-panel {
+      text-align: center;
+    }
+
+    #pickleButton {
+      width: min(300px, 80%);
+      aspect-ratio: 1 / 1;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      font-size: clamp(9rem, 25vw, 15rem);
+      filter: drop-shadow(0 14px 5px rgba(0,0,0,.25));
+      transition: transform .08s;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    #pickleButton:hover { transform: scale(1.05) rotate(-3deg); }
+    #pickleButton:active { transform: scale(.9) rotate(4deg); }
+
+    #clickMessage {
+      min-height: 32px;
+      font-size: 1.25rem;
+      font-weight: bold;
+      color: #2d803b;
+    }
+
+    .daily-box {
+      background: #fff7ad;
+      border: 4px dashed #d69b20;
+      border-radius: 18px;
+      padding: 15px;
+      margin-top: 14px;
+    }
+
+    button {
+      font: inherit;
+    }
+
+    .daily-button, .control-button {
+      border: none;
+      border-radius: 12px;
+      padding: 12px 16px;
+      font-weight: bold;
+      cursor: pointer;
+      color: white;
+      background: #298c3b;
+      box-shadow: 0 5px 0 #176126;
+      transition: transform .08s;
+    }
+
+    .daily-button:active, .control-button:active {
+      transform: translateY(4px);
+      box-shadow: 0 1px 0 #176126;
+    }
+
+    .daily-button:disabled {
+      background: #8a9b8c;
+      box-shadow: 0 5px 0 #647066;
+      cursor: not-allowed;
+    }
+
+    .shop-panel h2 {
+      margin-top: 0;
+      text-align: center;
+      color: #226c32;
+    }
+
+    #shop {
+      height: 560px;
+      overflow-y: auto;
+      padding-right: 8px;
+    }
+
+    .shop-item {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+      padding: 12px;
+      border: 3px solid #7db94c;
+      border-radius: 15px;
+      background: #efffdc;
+    }
+
+    .shop-item h3 {
+      margin: 0 0 4px;
+      color: #286b35;
+    }
+
+    .shop-item p {
+      margin: 2px 0;
+      font-size: .9rem;
+    }
+
+    .buy-button {
+      min-width: 105px;
+      border: none;
+      border-radius: 11px;
+      padding: 11px;
+      cursor: pointer;
+      color: white;
+      font-weight: bold;
+      background: #df8d22;
+      box-shadow: 0 4px 0 #a55e0a;
+    }
+
+    .buy-button:disabled {
+      background: #a9a9a9;
+      box-shadow: 0 4px 0 #777;
+      cursor: not-allowed;
+    }
+
+    .controls {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 18px;
+    }
+
+    .floating-pickle {
+      position: fixed;
+      pointer-events: none;
+      font-weight: bold;
+      color: #176c28;
+      animation: floatUp .8s ease-out forwards;
+      z-index: 100;
+    }
+
+    @keyframes floatUp {
+      from { opacity: 1; transform: translate(-50%, 0) scale(1); }
+      to { opacity: 0; transform: translate(-50%, -90px) scale(1.5); }
+    }
+
+    @media (max-width: 780px) {
+      .main-area { grid-template-columns: 1fr; }
+      .top-bar { grid-template-columns: 1fr; }
+      #shop { height: 480px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="game">
+    <h1>🥒 Pickle Clicker 🥒</h1>
+
+    <div class="top-bar">
+      <div class="stat">Pickles<span id="pickleCount">0</span></div>
+      <div class="stat">Per Click<span id="perClick">1</span></div>
+      <div class="stat">Per Second<span id="perSecond">0</span></div>
+    </div>
+
+    <div class="main-area">
+      <section class="panel click-panel">
+        <h2>Click the Pickle!</h2>
+        <button id="pickleButton" aria-label="Click the pickle">🥒</button>
+        <div id="clickMessage">Each click makes a pickle sound!</div>
+
+        <div class="daily-box">
+          <h3>🎁 Daily Pickle Prize</h3>
+          <p>Get a random reward from 1 to 100 pickles every day.</p>
+          <button class="daily-button" id="dailyButton">Claim Daily Prize</button>
+          <p id="dailyStatus"></p>
+        </div>
+      </section>
+
+      <section class="panel shop-panel">
+        <h2>🛒 Pickle Shop — 50 Offers</h2>
+        <div id="shop"></div>
+      </section>
+    </div>
+
+    <div class="controls">
+      <button class="control-button" id="saveButton">💾 Save Game</button>
+      <button class="control-button" id="resetButton">🗑️ Reset Game</button>
+      <button class="control-button" id="soundButton">🔊 Sound: ON</button>
+    </div>
+  </div>
+
+  <script>
+    let pickles = 0;
+    let clickPower = 1;
+    let picklesPerSecond = 0;
+    let soundOn = true;
+    let owned = Array(50).fill(0);
+
+    const pickleCountEl = document.getElementById("pickleCount");
+    const perClickEl = document.getElementById("perClick");
+    const perSecondEl = document.getElementById("perSecond");
+    const pickleButton = document.getElementById("pickleButton");
+    const shopEl = document.getElementById("shop");
+    const dailyButton = document.getElementById("dailyButton");
+    const dailyStatus = document.getElementById("dailyStatus");
+    const clickMessage = document.getElementById("clickMessage");
+    const soundButton = document.getElementById("soundButton");
+
+    const offers = Array.from({ length: 50 }, (_, i) => {
+      const number = i + 1;
+      const isAuto = i % 2 === 1;
+      return {
+        name: isAuto ? `Pickle Worker ${number}` : `Pickle Power ${number}`,
+        description: isAuto
+          ? `Produces ${Math.ceil(number / 2)} pickles every second.`
+          : `Adds ${Math.ceil(number / 3)} pickles to every click.`,
+        baseCost: Math.floor(10 * Math.pow(1.34, i)),
+        type: isAuto ? "auto" : "click",
+        power: isAuto ? Math.ceil(number / 2) : Math.ceil(number / 3)
+      };
+    });
+
+    function formatNumber(value) {
+      if (value < 1000) return Math.floor(value).toLocaleString();
+      const units = ["K", "M", "B", "T", "Qa", "Qi"];
+      let unit = -1;
+      while (value >= 1000 && unit < units.length - 1) {
+        value /= 1000;
+        unit++;
+      }
+      return value.toFixed(value >= 100 ? 0 : value >= 10 ? 1 : 2) + units[unit];
+    }
+
+    function getCost(index) {
+      return Math.floor(offers[index].baseCost * Math.pow(1.18, owned[index]));
+    }
+
+    function updateDisplay() {
+      pickleCountEl.textContent = formatNumber(pickles);
+      perClickEl.textContent = formatNumber(clickPower);
+      perSecondEl.textContent = formatNumber(picklesPerSecond);
+
+      document.querySelectorAll(".buy-button").forEach((button, index) => {
+        const cost = getCost(index);
+        button.textContent = `${formatNumber(cost)} 🥒`;
+        button.disabled = pickles < cost;
+      });
+
+      document.querySelectorAll(".owned-count").forEach((el, index) => {
+        el.textContent = owned[index];
+      });
+    }
+
+    function buildShop() {
+      shopEl.innerHTML = "";
+      offers.forEach((offer, index) => {
+        const item = document.createElement("div");
+        item.className = "shop-item";
+        item.innerHTML = `
+          <div>
+            <h3>${index + 1}. ${offer.name}</h3>
+            <p>${offer.description}</p>
+            <p>Owned: <strong class="owned-count">0</strong></p>
+          </div>
+          <button class="buy-button" data-index="${index}"></button>
+        `;
+        shopEl.appendChild(item);
+      });
+
+      document.querySelectorAll(".buy-button").forEach(button => {
+        button.addEventListener("click", () => buyOffer(Number(button.dataset.index)));
+      });
+    }
+
+    function buyOffer(index) {
+      const cost = getCost(index);
+      if (pickles < cost) return;
+
+      pickles -= cost;
+      owned[index]++;
+
+      const offer = offers[index];
+      if (offer.type === "click") clickPower += offer.power;
+      if (offer.type === "auto") picklesPerSecond += offer.power;
+
+      playBuySound();
+      updateDisplay();
+      saveGame();
+    }
+
+    function playPickleSound() {
+      if (!soundOn) return;
+
+      const audio = new (window.AudioContext || window.webkitAudioContext)();
+      const oscillator = audio.createOscillator();
+      const gain = audio.createGain();
+
+      oscillator.type = "square";
+      oscillator.frequency.setValueAtTime(260, audio.currentTime);
+      oscillator.frequency.exponentialRampToValueAtTime(115, audio.currentTime + 0.12);
+
+      gain.gain.setValueAtTime(0.14, audio.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + 0.15);
+
+      oscillator.connect(gain);
+      gain.connect(audio.destination);
+      oscillator.start();
+      oscillator.stop(audio.currentTime + 0.15);
+    }
+
+    function playBuySound() {
+      if (!soundOn) return;
+
+      const audio = new (window.AudioContext || window.webkitAudioContext)();
+      [350, 500, 700].forEach((frequency, i) => {
+        const oscillator = audio.createOscillator();
+        const gain = audio.createGain();
+        oscillator.frequency.value = frequency;
+        gain.gain.setValueAtTime(0.08, audio.currentTime + i * 0.06);
+        gain.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + i * 0.06 + 0.18);
+        oscillator.connect(gain);
+        gain.connect(audio.destination);
+        oscillator.start(audio.currentTime + i * 0.06);
+        oscillator.stop(audio.currentTime + i * 0.06 + 0.18);
+      });
+    }
+
+    function showFloatingText(event, amount) {
+      const text = document.createElement("div");
+      text.className = "floating-pickle";
+      text.textContent = `+${formatNumber(amount)} 🥒`;
+      text.style.left = event.clientX + "px";
+      text.style.top = event.clientY + "px";
+      document.body.appendChild(text);
+      setTimeout(() => text.remove(), 800);
+    }
+
+    pickleButton.addEventListener("click", event => {
+      pickles += clickPower;
+      playPickleSound();
+      showFloatingText(event, clickPower);
+
+      const messages = [
+        "Crunch!",
+        "Pickle power!",
+        "Dill-lightful!",
+        "That pickle was clicked!",
+        "More pickles!",
+        "Super crunchy!"
+      ];
+      clickMessage.textContent = messages[Math.floor(Math.random() * messages.length)];
+      updateDisplay();
+    });
+
+    function todayKey() {
+      const now = new Date();
+      return `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
+    }
+
+    function updateDailyReward() {
+      const lastClaim = localStorage.getItem("pickleDailyClaim");
+      if (lastClaim === todayKey()) {
+        dailyButton.disabled = true;
+        dailyStatus.textContent = "Come back tomorrow for another free prize!";
+      } else {
+        dailyButton.disabled = false;
+        dailyStatus.textContent = "Your free prize is ready!";
+      }
+    }
+
+    dailyButton.addEventListener("click", () => {
+      if (localStorage.getItem("pickleDailyClaim") === todayKey()) return;
+
+      const reward = Math.floor(Math.random() * 100) + 1;
+      pickles += reward;
+      localStorage.setItem("pickleDailyClaim", todayKey());
+      dailyStatus.textContent = `You won ${reward} free pickles!`;
+      playBuySound();
+      updateDailyReward();
+      updateDisplay();
+      saveGame();
+    });
+
+    function saveGame() {
+      const data = {
+        pickles,
+        clickPower,
+        picklesPerSecond,
+        owned,
+        soundOn
+      };
+      localStorage.setItem("pickleClickerSave", JSON.stringify(data));
+    }
+
+    function loadGame() {
+      const saved = localStorage.getItem("pickleClickerSave");
+      if (!saved) return;
+
+      try {
+        const data = JSON.parse(saved);
+        pickles = Number(data.pickles) || 0;
+        clickPower = Number(data.clickPower) || 1;
+        picklesPerSecond = Number(data.picklesPerSecond) || 0;
+        owned = Array.isArray(data.owned)
+          ? [...data.owned.slice(0, 50), ...Array(50).fill(0)].slice(0, 50)
+          : Array(50).fill(0);
+        soundOn = data.soundOn !== false;
+      } catch {
+        console.log("Could not load save.");
+      }
+    }
+
+    document.getElementById("saveButton").addEventListener("click", () => {
+      saveGame();
+      clickMessage.textContent = "Game saved!";
+    });
+
+    document.getElementById("resetButton").addEventListener("click", () => {
+      if (!confirm("Reset all of your pickle progress?")) return;
+      localStorage.removeItem("pickleClickerSave");
+      localStorage.removeItem("pickleDailyClaim");
+      location.reload();
+    });
+
+    soundButton.addEventListener("click", () => {
+      soundOn = !soundOn;
+      soundButton.textContent = soundOn ? "🔊 Sound: ON" : "🔇 Sound: OFF";
+      saveGame();
+    });
+
+    setInterval(() => {
+      if (picklesPerSecond > 0) {
+        pickles += picklesPerSecond / 10;
+        updateDisplay();
+      }
+    }, 100);
+
+    setInterval(saveGame, 5000);
+
+    buildShop();
+    loadGame();
+    soundButton.textContent = soundOn ? "🔊 Sound: ON" : "🔇 Sound: OFF";
+    updateDailyReward();
+    updateDisplay();
+  </script>
+</body>
+</html>
+'''
+
+path = Path("/mnt/data/pickle_clicker_game.html")
+path.write_text(html, encoding="utf-8")
+print(f"Created {path}")
